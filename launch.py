@@ -4,6 +4,10 @@ from argparse import ArgumentParser
 from utils.server_registration import get_cache_server
 from utils.config import Config
 from crawler import Crawler
+import nltk
+from nltk.corpus import stopwords 
+
+import logFunctions
 
 
 def main(config_file, restart):
@@ -16,8 +20,12 @@ def main(config_file, restart):
 
 
 if __name__ == "__main__":
+    logFunctions.clearLog()
+    
     parser = ArgumentParser()
     parser.add_argument("--restart", action="store_true", default=False)
     parser.add_argument("--config_file", type=str, default="config.ini")
     args = parser.parse_args()
     main(args.config_file, args.restart)
+    
+    logFunctions.printStats()

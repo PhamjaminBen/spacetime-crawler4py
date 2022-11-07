@@ -1,9 +1,52 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse,urljoin
+from bs4 import BeautifulSoup
+import textProcess
+import nltk
+import json
 
+log_dict = dict()
+page_bit_lengths = set()
+
+def logUpdate():
+    log = open('logs.json', 'w')
+    json.dump(log_dict, log)
+    log.close()
+    
+    
 def scraper(url, resp):
+    #if page has no content or errors
+    if not resp or not resp.raw_response or resp.status != 200:
+        return list()
+    
+    #avoid crawling large content
+    if len(resp.raw_response.content) > 1_000_000:
+        return list()
+    
+    #skipped because duplicate page
+    if len(resp.raw_response.content) in page_bit_lengths:
+        return list()
+    
+    #add to set for duplicate detection
+    page_bit_lengths.add(len(resp.raw_response.content))
+    
+    
+    page = BeautifulSoup(resp.raw_response.content, "html.parser")
+    page_text = textProcess.tokenize(page.text)
+    
+    #short stubs
+    if len(page_text) < 50:
+        return list()
+    
+    #pages with lots of reptition, not a lot of unique words are considered low information value
+    elif len(set(page_text))/len(page_text) < 0.25:
+        return list()
+    
+    #adding page and teext to dictionary to be saved to file
+    log_dict[url] = page_text
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
+
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -15,8 +58,13 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    print(resp.raw_response)
-    return list()
+    page = BeautifulSoup(resp.raw_response.content, "html.parser")
+    urls = list()
+    for link in page.findAll('a'):
+        new_url = link.get('href')
+        urls.append(new_url)
+    return urls
+
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
@@ -26,6 +74,10 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+        
+        if not re.match(r".*(\.ics\.uci\.edu|\.cs\.uci\.edu|\.informatics\.uci\.edu|\.stat\.uci\.edu|today\.uci\.edu\/department\/information_computer_sciences).*", parsed.netloc):
+            return False
+
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
